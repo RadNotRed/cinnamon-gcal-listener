@@ -32,6 +32,9 @@ GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
 # Must be HTTPS and publicly accessible (use ngrok for local dev)
 WEBHOOK_BASE_URL=https://your-domain.com
 
+# Discord Webhook Configuration
+DISCORD_WEBHOOK_URL=
+
 # Database Configuration
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
