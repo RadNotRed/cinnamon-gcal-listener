@@ -6,9 +6,10 @@ export const CONFIG = {
   GOOGLE_SERVICE_ACCOUNT_EMAIL: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
   GOOGLE_PRIVATE_KEY: process.env.GOOGLE_PRIVATE_KEY || '',
   WEBHOOK_BASE_URL: process.env.WEBHOOK_BASE_URL || '',
+  DISCORD_WEBHOOK_URL: process.env.DISCORD_WEBHOOK_URL || '',
   PORT: parseInt(process.env.PORT || '3000', 10),
   POSTGRES: {
-    HOST: process.env.POSTGRES_HOST || 'localhost',
+    HOST: process.env.POSTGRES_HOST || 'postgres',
     PORT: parseInt(process.env.POSTGRES_PORT || '5432', 10),
     USER: process.env.POSTGRES_USER || 'postgres',
     PASSWORD: process.env.POSTGRES_PASSWORD || '',

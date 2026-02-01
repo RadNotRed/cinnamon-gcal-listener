@@ -2,6 +2,7 @@ import { listEvents } from './calendar';
 import { pool } from './db';
 import { generateDiffLogs } from './diff';
 import { calendar_v3 } from 'googleapis';
+import { sendDiscordMessage } from './discord';
 
 export const syncCalendar = async (calendarId: string) => {
   const client = await pool.connect();
@@ -11,6 +12,7 @@ export const syncCalendar = async (calendarId: string) => {
     // 1. Get current sync token
     const res = await client.query('SELECT sync_token FROM calendar_sync_state WHERE calendar_id = $1', [calendarId]);
     const currentSyncToken = res.rows.length > 0 ? res.rows[0].sync_token : undefined;
+    const isInitialSync = !currentSyncToken;
 
     // 2. Fetch events from Google
     const { events, nextSyncToken } = await listEvents(calendarId, currentSyncToken);
@@ -39,7 +41,11 @@ export const syncCalendar = async (calendarId: string) => {
         const oldRes = await client.query('SELECT event_data FROM calendar_events_snapshot WHERE calendar_id = $1 AND event_id = $2', [calendarId, eventId]);
         if (oldRes.rows.length > 0) {
           const oldEvent = oldRes.rows[0].event_data;
-          console.log(`[LOG] Event Deleted: ${oldEvent.summary || '(No Title)'} (ID: ${eventId})`);
+          const msg = `🗑️ **Event Deleted**: ${oldEvent.summary || '(No Title)'} (ID: ${eventId})`;
+          console.log(`[LOG] ${msg}`);
+          if (!isInitialSync) {
+            await sendDiscordMessage(msg);
+          }
           await client.query('DELETE FROM calendar_events_snapshot WHERE calendar_id = $1 AND event_id = $2', [calendarId, eventId]);
         } else {
            console.log(`[LOG] Event Deleted (but was not in cache): ID ${eventId}`);
@@ -50,14 +56,32 @@ export const syncCalendar = async (calendarId: string) => {
         
         if (oldRes.rows.length === 0) {
           // New Event
-          console.log(`[LOG] New Event Added: ${event.summary || '(No Title)'} at ${event.start?.dateTime || event.start?.date}`);
+          const time = event.start?.dateTime || event.start?.date || 'Unknown Time';
+          const msg = `🆕 **New Event Added**: ${event.summary || '(No Title)'} at ${time}`;
+          
+          if (isInitialSync) {
+             console.log(`[LOG] (Initial Sync - Silent) ${msg}`);
+          } else {
+             console.log(`[LOG] ${msg}`);
+             await sendDiscordMessage(msg);
+          }
         } else {
           // Update
           const oldEvent = oldRes.rows[0].event_data;
           const changes = generateDiffLogs(oldEvent, event);
           if (changes.length > 0) {
-            console.log(`[LOG] Event Updated: "${event.summary || '(No Title)'}"`);
-            changes.forEach(change => console.log(`      -> ${change}`));
+            const title = event.summary || '(No Title)';
+            console.log(`[LOG] Event Updated: "${title}"`);
+            
+            let discordMsg = `✏️ **Event Updated**: "${title}"\n`;
+            changes.forEach(change => {
+                console.log(`      -> ${change}`);
+                discordMsg += `> ${change}\n`;
+            });
+            
+            if (!isInitialSync) {
+              await sendDiscordMessage(discordMsg);
+            }
           }
         }
 
