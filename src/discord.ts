@@ -1,10 +1,26 @@
 import { CONFIG } from './config';
 
-export const sendDiscordMessage = async (content: string) => {
+export interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  timestamp?: string;
+  footer?: { text: string; icon_url?: string };
+  thumbnail?: { url: string };
+  image?: { url: string };
+  author?: { name: string; url?: string; icon_url?: string };
+  fields?: { name: string; value: string; inline?: boolean }[];
+}
+
+export const sendDiscordMessage = async (content?: string, embed?: DiscordEmbed) => {
   if (!CONFIG.DISCORD_WEBHOOK_URL) {
-    // If no webhook configured, just ignore
     return;
   }
+
+  const body: any = {};
+  if (content) body.content = content;
+  if (embed) body.embeds = [embed];
 
   try {
     const res = await fetch(CONFIG.DISCORD_WEBHOOK_URL, {
@@ -12,7 +28,7 @@ export const sendDiscordMessage = async (content: string) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

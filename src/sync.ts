@@ -2,7 +2,8 @@ import { listEvents } from './calendar';
 import { pool } from './db';
 import { generateDiffLogs } from './diff';
 import { calendar_v3 } from 'googleapis';
-import { sendDiscordMessage } from './discord';
+import { sendDiscordMessage, DiscordEmbed } from './discord';
+import { getEventColor, getDiscordColor, DEFAULT_COLOR } from './colors';
 
 export const syncCalendar = async (calendarId: string) => {
   const client = await pool.connect();
@@ -19,7 +20,6 @@ export const syncCalendar = async (calendarId: string) => {
     
     if (events.length === 0) {
       console.log(`No changes found for ${calendarId}.`);
-       // Even if no events, we should update sync token if it changed
        if (nextSyncToken && nextSyncToken !== currentSyncToken) {
           await client.query(
             'INSERT INTO calendar_sync_state (calendar_id, sync_token, last_synced_at) VALUES ($1, $2, NOW()) ON CONFLICT (calendar_id) DO UPDATE SET sync_token = $2, last_synced_at = NOW()',
@@ -41,29 +41,48 @@ export const syncCalendar = async (calendarId: string) => {
         const oldRes = await client.query('SELECT event_data FROM calendar_events_snapshot WHERE calendar_id = $1 AND event_id = $2', [calendarId, eventId]);
         if (oldRes.rows.length > 0) {
           const oldEvent = oldRes.rows[0].event_data;
-          const msg = `🗑️ **Event Deleted**: ${oldEvent.summary || '(No Title)'} (ID: ${eventId})`;
-          console.log(`[LOG] ${msg}`);
+          console.log(`[LOG] Event Deleted: ${oldEvent.summary || '(No Title)'} (ID: ${eventId})`);
+          
           if (!isInitialSync) {
-            await sendDiscordMessage(msg);
+            const embed: DiscordEmbed = {
+              title: '🗑️ Event Deleted',
+              description: `**${oldEvent.summary || '(No Title)'}**`,
+              color: 0xff0000, // Red
+              fields: [
+                 { name: 'Time', value: oldEvent.start?.dateTime || oldEvent.start?.date || 'Unknown', inline: true },
+                 { name: 'Location', value: oldEvent.location || 'None', inline: true }
+              ],
+              timestamp: new Date().toISOString()
+            };
+            await sendDiscordMessage(undefined, embed);
           }
           await client.query('DELETE FROM calendar_events_snapshot WHERE calendar_id = $1 AND event_id = $2', [calendarId, eventId]);
-        } else {
-           console.log(`[LOG] Event Deleted (but was not in cache): ID ${eventId}`);
         }
       } else {
         // Handle Add or Update
         const oldRes = await client.query('SELECT event_data FROM calendar_events_snapshot WHERE calendar_id = $1 AND event_id = $2', [calendarId, eventId]);
         
+        const colorInfo = getEventColor(event.colorId);
+        
         if (oldRes.rows.length === 0) {
           // New Event
           const time = event.start?.dateTime || event.start?.date || 'Unknown Time';
-          const msg = `🆕 **New Event Added**: ${event.summary || '(No Title)'} at ${time}`;
+          console.log(`[LOG] New Event Added: ${event.summary || '(No Title)'} at ${time}`);
           
-          if (isInitialSync) {
-             console.log(`[LOG] (Initial Sync - Silent) ${msg}`);
-          } else {
-             console.log(`[LOG] ${msg}`);
-             await sendDiscordMessage(msg);
+          if (!isInitialSync) {
+             const embed: DiscordEmbed = {
+              title: '🆕 New Event Added',
+              description: `**${event.summary || '(No Title)'}**\n\n${event.description || ''}`,
+              color: getDiscordColor(colorInfo.hex), // Use Event Color or Default
+              fields: [
+                 { name: 'Time', value: time, inline: true },
+                 { name: 'Location', value: event.location || 'None', inline: true },
+                 { name: 'Color', value: colorInfo.name, inline: true }
+              ],
+              url: event.htmlLink || undefined,
+              timestamp: new Date().toISOString()
+            };
+            await sendDiscordMessage(undefined, embed);
           }
         } else {
           // Update
@@ -73,14 +92,21 @@ export const syncCalendar = async (calendarId: string) => {
             const title = event.summary || '(No Title)';
             console.log(`[LOG] Event Updated: "${title}"`);
             
-            let discordMsg = `✏️ **Event Updated**: "${title}"\n`;
-            changes.forEach(change => {
-                console.log(`      -> ${change}`);
-                discordMsg += `> ${change}\n`;
-            });
-            
             if (!isInitialSync) {
-              await sendDiscordMessage(discordMsg);
+               const changeFields = changes.map(change => {
+                 // Try to split key/value or just put as value
+                 return { name: 'Change', value: change, inline: false };
+               });
+
+               const embed: DiscordEmbed = {
+                  title: '✏️ Event Updated',
+                  description: `**${title}**`,
+                  color: 0xffa500, // Orange
+                  fields: changeFields,
+                  url: event.htmlLink || undefined,
+                  timestamp: new Date().toISOString()
+               };
+               await sendDiscordMessage(undefined, embed);
             }
           }
         }
