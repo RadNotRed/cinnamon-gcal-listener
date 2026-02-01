@@ -93,7 +93,8 @@ export const syncCalendar = async (calendarId: string) => {
             console.log(`[LOG] Event Updated: "${title}"`);
             
             if (!isInitialSync) {
-               const changeFields = changes.map(change => {
+               const isColorChange = changes.some(c => c.startsWith('Color changed'));
+               const changeFields = changes.map((change: string) => {
                  // Try to split key/value or just put as value
                  return { name: 'Change', value: change, inline: false };
                });
@@ -101,7 +102,7 @@ export const syncCalendar = async (calendarId: string) => {
                const embed: DiscordEmbed = {
                   title: '✏️ Event Updated',
                   description: `**${title}**`,
-                  color: 0xffa500, // Orange
+                  color: isColorChange ? getDiscordColor(getEventColor(event.colorId).hex) : 0xffa500, // Orange or New Color
                   fields: changeFields,
                   url: event.htmlLink || undefined,
                   timestamp: new Date().toISOString()

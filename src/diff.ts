@@ -1,4 +1,5 @@
 import { calendar_v3 } from 'googleapis';
+import { getEventColor } from './colors';
 
 type Event = calendar_v3.Schema$Event;
 
@@ -33,7 +34,9 @@ export const generateDiffLogs = (oldEvent: Event, newEvent: Event): string[] => 
 
   // Color (colorId)
   if (oldEvent.colorId !== newEvent.colorId) {
-    changes.push(`Color ID changed from ${oldEvent.colorId || 'Default'} to ${newEvent.colorId || 'Default'}`);
+    const oldColor = getEventColor(oldEvent.colorId);
+    const newColor = getEventColor(newEvent.colorId);
+    changes.push(`Color changed from ${oldColor.name} to ${newColor.name}`);
   }
 
   return changes;
@@ -41,5 +44,7 @@ export const generateDiffLogs = (oldEvent: Event, newEvent: Event): string[] => 
 
 const formatTime = (start?: string | null, end?: string | null) => {
   if (!start && !end) return 'Unknown';
-  return `[${start || '?'} to ${end || '?'}]`;
+  if (!start && end) return `[? to ${end}]`; // Should ideally not happen for valid events
+  if (start && !end) return `[${start} to ?]`;
+  return `[${start} to ${end}]`;
 };
