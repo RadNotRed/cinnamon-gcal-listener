@@ -71,3 +71,16 @@ export const ensureSubscriptions = async () => {
     }
   }
 };
+
+const RENEWAL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+export const startSubscriptionRenewalLoop = () => {
+  console.log(`Starting subscription renewal loop (every ${RENEWAL_INTERVAL_MS / 60000} min).`);
+  setInterval(async () => {
+    try {
+      await ensureSubscriptions();
+    } catch (err) {
+      console.error('Subscription renewal check failed:', err);
+    }
+  }, RENEWAL_INTERVAL_MS);
+};

@@ -1,6 +1,6 @@
 import { startServer } from './server';
 import { initDB } from './db';
-import { ensureSubscriptions } from './subscription';
+import { ensureSubscriptions, startSubscriptionRenewalLoop } from './subscription';
 import { CONFIG } from './config';
 
 const main = async () => {
@@ -18,6 +18,7 @@ const main = async () => {
     // Note: ensureSubscriptions makes outgoing calls to Google.
     if (CONFIG.WEBHOOK_BASE_URL && !CONFIG.WEBHOOK_BASE_URL.includes('localhost')) {
        await ensureSubscriptions();
+       startSubscriptionRenewalLoop();
     } else {
        console.warn('WEBHOOK_BASE_URL not set or localhost. Skipping subscription setup (Webhooks require public HTTPS).');
        console.log('Use ngrok or similar and update .env if you want to test webhooks locally.');
